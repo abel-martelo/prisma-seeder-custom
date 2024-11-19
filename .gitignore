@@ -3,5 +3,4 @@ extras/
 prisma/
 *.log
 tests/
-*.md
 .npmignore
