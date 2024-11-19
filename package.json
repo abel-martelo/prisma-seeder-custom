@@ -1,0 +1,31 @@
+{
+  "name": "prisma-seeder-custom",
+  "version": "0.2.1",
+  "bin": {
+    "prisma-seeder-custom": "cli.js"
+  },
+  "description": "A CLI tool to generate Prisma seed files automatically.",
+  "main": "cli.js",
+  "scripts": {
+    "start": "node cli.js",
+    "test": "echo \"No tests specified\" && exit 0"
+  },
+  "keywords": [
+    "prisma",
+    "seeds",
+    "generator",
+    "cli"
+  ],
+  "repository": {
+    "type": "git",
+    "url": ""
+  },
+  "author": "TheOne-galaxy",
+  "license": "MIT",
+  "dependencies": {
+    "inquirer": "12.1.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
