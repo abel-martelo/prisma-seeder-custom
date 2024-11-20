@@ -16,7 +16,7 @@ Mi primera biblioteca , puede que tenga errores que se me hayan escapado, pido s
 Puedes instalar esta herramienta en tu proyecto con npm:
 
 ```bash
-npm install prisma-seed-custom
+npm install prisma-seeder-custom
 ```
 
 Antes de empezar, agrega lo siguiente a tu archivo schema.prisma y ejecuta la migración:
