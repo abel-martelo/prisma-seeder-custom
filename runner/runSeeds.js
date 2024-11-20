@@ -66,28 +66,30 @@ function createSeedFileIfNotExists() {
     fs.mkdirSync(seedersDir, { recursive: true });
   }
   if (!fs.existsSync(seedFilePath)) {
-const seedJsTemplate = `
-const fs = require('fs');
-const path = require('path');
-
-async function runSeeds() {
-  const seedFiles = fs.readdirSync(path.join(__dirname, 'seeders'));
-  const jsFiles = seedFiles.filter(file => file.endsWith('.js'));
-
-  for (const file of jsFiles) {
-    const seedFunctionName = file.replace('.js', '');
-    const { [seedFunctionName]: seedFunction } = require(\`./seeders/\${file}\`);
-
-    console.log(\`Ejecutando semilla: \${file}\`);
-    await seedFunction();
-  }
-}
-
-runSeeds().catch((error) => {
-  console.error("Error al ejecutar las semillas:", error);
-  process.exit(1);
-});
-`;
+    const seedJsTemplate = `
+    import fs from 'fs';
+    import path from 'path';
+    async function runSeeds() {
+      const seedersDir = path.join(process.cwd(), 'prisma', 'seeders');
+      const seedFiles = fs.readdirSync(seedersDir);
+      const jsFiles = seedFiles.filter(file => file.endsWith('.js'));
+      for (const file of jsFiles) {
+        const seedFunctionName = file.replace('.js', '');
+        const modulePath = path.join(seedersDir, file);
+        const module = await import(modulePath);
+        if (typeof module[seedFunctionName] !== 'function') {
+          console.error(\`El archivo "\${file}" no exporta una función válida.\`);
+          continue;
+        }
+        console.log(\`Ejecutando semilla: \${file}\`);
+        await module[seedFunctionName]();
+      }
+    }
+    runSeeds().catch((error) => {
+      console.error("Error al ejecutar las semillas:", error);
+      process.exit(1);
+    });
+    `;
 fs.writeFileSync(seedFilePath, seedJsTemplate.trim());
 console.log('Archivo "prisma/seed.js" creado correctamente con la configuración para ejecutar las semillas.');  
 } else {

@@ -66,7 +66,7 @@ export async function ${formattedSeedName}() {
 }
   `;
 
-  const filePath = path.join(seedersDir, `${capitalizedSeedName}.js`);
+  const filePath = path.join(seedersDir, `${formattedSeedName}.js`);
     if (fs.existsSync(filePath)) {
       console.log(`La semilla ${formattedSeedName} ya existe en la carpeta seeders.`);
       return;

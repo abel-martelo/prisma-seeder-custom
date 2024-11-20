@@ -1,5 +1,4 @@
 const path = require('path');
-
 /**
  * Carga un módulo usando require si está disponible, de lo contrario, usa import().
  * @param {string} modulePath - La ruta del módulo a cargar.
@@ -7,11 +6,11 @@ const path = require('path');
  */
 async function loadModule(modulePath) {
   try {
-    return require(modulePath);
+    const moduleUrl = pathToFileURL(modulePath).href;
+    return await import(moduleUrl);
   } catch (error) {
-    if (error.code === 'ERR_REQUIRE_ESM') {
-      const moduleUrl = pathToFileURL(modulePath).href;
-      return import(moduleUrl);
+    if (error.code === 'ERR_MODULE_NOT_FOUND' || error.code === 'ERR_UNSUPPORTED_ESM_URL_SCHEME') {
+      return require(modulePath);
     }
     throw error;
   }
