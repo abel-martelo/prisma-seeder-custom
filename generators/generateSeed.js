@@ -1,28 +1,16 @@
 const fs = require('fs');
 const path = require('path');
 const inquirer = require('inquirer');
-
-function addSeedConfigToPackageJson() {
-  try {
-    const packageJsonPath = path.join(process.cwd(), 'package.json');
-    const packageJson = require(packageJsonPath);
-    if (!packageJson.prisma) {
-      packageJson.prisma = {};
-    }
-    if (!packageJson.prisma.seed) {
-      packageJson.prisma.seed = 'node prisma/seed.js';
-      fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2));
-      console.log('Se añadió la configuración de seed al package.json');
-    } else {
-      console.log('La configuración de seed ya existe en package.json');
-    }
-  } catch (error) {
-    console.error('Error al modificar el package.json:', error.message);
-  }
-}
+const { generateNumberedFileName, detectModuleSystem } = require('../utils');
 
 async function generateSeed(seedName) {
   try {
+    const projectRoot = path.resolve(process.cwd());
+    const seedersDir = path.join(projectRoot, 'prisma', 'seeders');
+    if (!fs.existsSync(seedersDir)) {
+      fs.mkdirSync(seedersDir, { recursive: true });
+      console.log('📂 Carpeta "prisma/seeders" creada.');
+    }
     if (!seedName) {
       const answer = await inquirer.prompt({
         type: 'input',
@@ -33,51 +21,91 @@ async function generateSeed(seedName) {
       seedName = answer.seedName;
     }
     const formattedSeedName = seedName.charAt(0).toUpperCase() + seedName.slice(1);
-    const modelName = formattedSeedName.toLowerCase();
-    const projectRoot = path.resolve(process.cwd());
-    const seedersDir = path.join(projectRoot, 'prisma', 'seeders');
+    const fileName = await generateNumberedFileName(seedersDir, formattedSeedName + '.js');
 
-    if (!fs.existsSync(seedersDir)) {
-      fs.mkdirSync(seedersDir, { recursive: true });
-      console.log('Carpeta "prisma/seeders" creada.');
-    }
-
-  const seedTemplate = `
-import { PrismaClient } from '@prisma/client';
-const prisma = new PrismaClient();
-
-export async function ${formattedSeedName}() {
-  const existingCount = await prisma.${modelName}.count();
-  if (existingCount === 0) {
-    await prisma.${modelName}.createMany({
-      data: [
-        {
-          name: 'Example Name',  // Ejemplo de campo personalizado
-          email: 'example@example.com',  // Otro campo personalizado
-          // Agregar otros campos según sea necesario
-        },
-        // Agregar más objetos si es necesario
-      ],
-    });
-    console.log('Datos insertados correctamente en ${modelName}');
-  } else {
-    console.log('Los datos ya existen, no se insertan nuevamente');
-  }
-}
-  `;
-
-  const filePath = path.join(seedersDir, `${formattedSeedName}.js`);
+    const filePath = path.join(seedersDir, fileName);
     if (fs.existsSync(filePath)) {
-      console.log(`La semilla ${formattedSeedName} ya existe en la carpeta seeders.`);
+      console.log(`⚠️ La semilla "${fileName}" ya existe.`);
       return;
     }
+    const seedTemplateESM = `
+import { PrismaClient } from '@prisma/client'
+const prisma = new PrismaClient()
 
-    fs.writeFileSync(filePath, seedTemplate.trim());
-    const relativePath = path.relative(projectRoot, filePath);
-    console.log(`Semilla '${formattedSeedName}' creada en ${relativePath}`);
-    addSeedConfigToPackageJson();
+async function main() {
+  const ${seedName.toLowerCase()} = await prisma.${seedName.toLowerCase()}.upsert({
+    where: { id: 1 }, // Cambiar según el modelo
+    update: {},
+    create: {
+      name: 'Example Name',
+      email: 'example@example.com',
+      posts: {
+        create: [
+          {
+            title: 'First Post',
+            content: 'Content of the first post',
+            published: true,
+          },
+        ],
+      },
+    },
+  });
+  console.log('${seedName.toLowerCase()}: ',${seedName.toLowerCase()})
+  console.log('✅ Datos insertados correctamente en ${seedName.toLowerCase()}');
+}
+main()
+  .then(async () => {
+    await prisma.$disconnect();
+  })
+  .catch(async (e) => {
+    console.error(e);
+    await prisma.$disconnect();
+    process.exit(1);
+  });
+    `.trim();
+
+const seedTemplateCommonJS = `
+const { PrismaClient } = require('@prisma/client');
+const prisma = new PrismaClient();
+
+async function main() {
+  const ${seedName.toLowerCase()} = await prisma.${seedName.toLowerCase()}.upsert({
+    where: { id: 1 }, // Cambiar según el modelo
+    update: {},
+    create: {
+      name: 'Example Name',
+      email: 'example@example.com',
+      posts: {
+        create: [
+          {
+            title: 'First Post',
+            content: 'Content of the first post',
+            published: true,
+          },
+        ],
+      },
+    },
+  });
+
+  console.log('${seedName.toLowerCase()}: ',${seedName.toLowerCase()})
+  console.log('✅ Datos insertados correctamente en ${seedName.toLowerCase()}');
+}
+main()
+  .then(async () => {
+    await prisma.$disconnect();
+  })
+  .catch(async (e) => {
+    console.error(e);
+    await prisma.$disconnect();
+    process.exit(1);
+  });
+        `.trim();
+    const moduleSystem = detectModuleSystem();
+    const seedTemplate = moduleSystem === 'esm' ? seedTemplateESM : seedTemplateCommonJS;
+    fs.writeFileSync(filePath, seedTemplate);
+    console.log(`✅ Semilla "${fileName}" creada en "prisma/seeders".`);
   } catch (error) {
-    console.error('Error al generar la semilla:', error.message);
+    console.error('❌ Error al generar la semilla:', error);
   }
 }
 
