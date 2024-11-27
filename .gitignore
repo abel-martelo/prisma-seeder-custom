@@ -4,3 +4,4 @@ prisma/
 *.log
 tests/
 .npmignore
+package-lock.json

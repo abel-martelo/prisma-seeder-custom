@@ -1,7 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const inquirer = require('inquirer');
-const { generateNumberedFileName, detectModuleSystem } = require('../utils');
+const { formatDate, detectModuleSystem } = require('../utils');
 
 async function generateSeed(seedName) {
   try {
@@ -9,32 +9,33 @@ async function generateSeed(seedName) {
     const seedersDir = path.join(projectRoot, 'prisma', 'seeders');
     if (!fs.existsSync(seedersDir)) {
       fs.mkdirSync(seedersDir, { recursive: true });
-      console.log('📂 Carpeta "prisma/seeders" creada.');
+      console.log('📂 "prisma/seeders" folder created.');
     }
     if (!seedName) {
       const answer = await inquirer.prompt({
         type: 'input',
         name: 'seedName',
-        message: 'Nombre de la semilla:',
-        validate: (input) => (input.trim() ? true : 'El nombre no puede estar vacío.'),
+        message: 'Seed name:',
+        validate: (input) => (input.trim() ? true : 'The name cannot be empty.'),
       });
       seedName = answer.seedName;
     }
     const formattedSeedName = seedName.charAt(0).toUpperCase() + seedName.slice(1);
-    const fileName = await generateNumberedFileName(seedersDir, formattedSeedName + '.js');
+    const currentDate = formatDate();
+    const fileName = `${currentDate}_${formattedSeedName + '.js'}`;
 
     const filePath = path.join(seedersDir, fileName);
     if (fs.existsSync(filePath)) {
-      console.log(`⚠️ La semilla "${fileName}" ya existe.`);
+      console.log(`⚠️ The seed "${fileName}" already exists.`);
       return;
     }
     const seedTemplateESM = `
 import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
 
-async function main() {
+export async function main() {
   const ${seedName.toLowerCase()} = await prisma.${seedName.toLowerCase()}.upsert({
-    where: { id: 1 }, // Cambiar según el modelo
+    where: { id: 1 }, // Change depending on the model
     update: {},
     create: {
       name: 'Example Name',
@@ -51,18 +52,24 @@ async function main() {
     },
   });
   console.log('${seedName.toLowerCase()}: ',${seedName.toLowerCase()})
-  console.log('✅ Datos insertados correctamente en ${seedName.toLowerCase()}');
+  console.log('✅ Data successfully inserted into ${seedName.toLowerCase()}');
 }
-main()
-  .then(async () => {
-    await prisma.$disconnect();
-  })
-  .catch(async (e) => {
-    console.error(e);
-    await prisma.$disconnect();
-    process.exit(1);
-  });
-    `.trim();
+
+export async function down() {
+  try {
+    const deleted = await prisma.${seedName.toLowerCase()}.deleteMany({
+      where: {
+        email: 'example@example.com', // Condition that identifies the data created by the seed
+      },
+    });
+    console.log(\`↩️ Rollback completed: \${deleted.count} records deleted.\`);
+  } catch (e) {
+    console.error('❌ Error while performing rollback:', e.message);
+    throw e;
+  }
+}
+;`
+.trim();
 
 const seedTemplateCommonJS = `
 const { PrismaClient } = require('@prisma/client');
@@ -70,7 +77,7 @@ const prisma = new PrismaClient();
 
 async function main() {
   const ${seedName.toLowerCase()} = await prisma.${seedName.toLowerCase()}.upsert({
-    where: { id: 1 }, // Cambiar según el modelo
+    where: { id: 1 }, // Change depending on the model
     update: {},
     create: {
       name: 'Example Name',
@@ -88,24 +95,32 @@ async function main() {
   });
 
   console.log('${seedName.toLowerCase()}: ',${seedName.toLowerCase()})
-  console.log('✅ Datos insertados correctamente en ${seedName.toLowerCase()}');
+  console.log('✅ Data successfully inserted into ${seedName.toLowerCase()}');
 }
-main()
-  .then(async () => {
-    await prisma.$disconnect();
-  })
-  .catch(async (e) => {
-    console.error(e);
-    await prisma.$disconnect();
-    process.exit(1);
-  });
-        `.trim();
+
+async function down() {
+  try {
+    const deleted = await prisma.${seedName.toLowerCase()}.deleteMany({
+      where: {
+        email: 'example@example.com', // Condition that identifies the data created by the seed
+      },
+    });
+    console.log(\`↩️ Rollback completed: \${deleted.count} records deleted.\`);
+  } catch (e) {
+    console.error('❌ Error while performing rollback:', e.message);
+    throw e;
+  }
+}  
+module.exports = { main, down };
+
+`.trim();
+
     const moduleSystem = detectModuleSystem();
     const seedTemplate = moduleSystem === 'esm' ? seedTemplateESM : seedTemplateCommonJS;
     fs.writeFileSync(filePath, seedTemplate);
-    console.log(`✅ Semilla "${fileName}" creada en "prisma/seeders".`);
+    console.log(`✅ Seed "${fileName}" created in "prisma/seeders".`);
   } catch (error) {
-    console.error('❌ Error al generar la semilla:', error);
+    console.error('❌ Error generating seed:', error);
   }
 }
 

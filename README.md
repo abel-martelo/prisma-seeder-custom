@@ -1,37 +1,39 @@
 # Prisma Seeder Custom
 
-Una herramienta de línea de comandos para generar y gestionar archivos de semillas (`seeds`) en proyectos con Prisma. Facilita la creación y administración de datos iniciales o de ejemplo en tu base de datos, asegurando un manejo eficiente y evitando duplicaciones.
+A command line tool to generate and manage seed files in Prisma projects. It facilitates the creation and management of initial or example data in your database, ensuring efficient management and avoiding duplication.
 
 ---
 
-## Características
+## Characteristics
 
-- **Generación automática de archivos de semillas:**
-  - Automatiza la creación de scripts de semillas para tus modelos en Prisma.
-  - Los archivos se generan con nombres únicos y ordenados, utilizando un prefijo numérico incremental.
+- **Automatic generation of seed files:**
+  - Automate the creation of seed scripts for your models in Prisma.
+  - The files are generated with unique and ordered names, using the current date as a prefix.
 
-- **Prevención de duplicados:**
-  - Evita la re-ejecución de semillas previamente aplicadas, registrando cada ejecución en la tabla `SeedExecution`.
+- **Prevention of duplicates:**
+  - Avoid re-executing previously applied seeds by logging each execution in the `SeedExecution` table.
 
-- **Compatibilidad con migraciones:**
-  - Integra la creación y ejecución de semillas dentro del flujo de migraciones de Prisma.
+- **Seed reversal:**
+Removes the data inserted by the seeds in the reverse order of their execution.  
+
+- **Migration support:**
+  - Integrates the creation and execution of seeds within the Prisma migration flow.
 
 ---
 
-## Instalación
+## Installation
 
-Instala esta herramienta con npm:
+Install this tool with npm:
 
 ```bash
 npm install prisma-seeder-custom
-
 ```
 
-## Configuración inicial
-Antes de comenzar, asegúrate de seguir estos pasos para configurar tu proyecto:
+## Initial setup
+Before you begin, be sure to follow these steps to set up your project:
 
-1. Define el modelo SeedExecution en tu archivo schema.prisma
-Añade el siguiente modelo en tu archivo schema.prisma para registrar las semillas ejecutadas:
+1. Define the SeedExecution model in your schema.prisma file
+Add the following model to your schema.prisma file to record the executed seeds:
 
 ```prisma
 model SeedExecution {
@@ -40,7 +42,7 @@ model SeedExecution {
   executedAt DateTime @default(now())
 }
 ```
-2. Aplica los cambios al esquema de la base de datos
+2. Apply changes to the database schema
 ```bash
 npx prisma migrate dev --name add-seed-execution-model
 ```
@@ -49,29 +51,30 @@ npx prisma migrate dev --name add-seed-execution-model
 
 ## Uso
 
-1. Generar un archivo de semilla
-Ejecuta el siguiente comando para generar un archivo de semilla:
+1. ## Generate a seed file
+Run the following command to generate a seed file:
 ```bash
-npx prisma-seeder-custom generate <nombre_del_modelo>
+npx prisma-seeder-custom generate <model_name>
 ```
--<nombre_del_modelo>: Nombre del modelo en tu archivo schema.prisma (por ejemplo: User, Post, etc.).
+-<model_name>: Name of the model in your schema.prisma file (for example: User, Post, etc.).
 
--La herramienta generará un archivo en el directorio prisma/seeders con un nombre como 01_NombreDelModelo.js.
+-The tool will generate a file in the prisma/seeders directory with a name like 01_ModelName.js.
 
-Ejemplo:
+Example:
 
 ```bash
 npx prisma-seeder-custom generate user
 ```
 
-Esto generará un archivo prisma/seeders/01_User.js con la siguiente estructura básica:
+This will generate a prisma/seeders/01_User.js file with the following basic structure:
 
 ```javascript
 import { PrismaClient } from '@prisma/client'
 const prisma = new PrismaClient()
-async function main() {
+
+export async function main() {
   const user = await prisma.user.upsert({
-    where: { id: 1 }, // Cambiar según el modelo
+    where: { id: 1 }, // Change depending on the model
     update: {},
     create: {
       name: 'Example Name',
@@ -88,42 +91,80 @@ async function main() {
     },
   });
   console.log('user: ',user)
-  console.log('✅ Datos insertados correctamente en user');
+  console.log('✅ Data successfully inserted into user');
 }
-main()
-  .then(async () => {
-    await prisma.$disconnect();
-  })
-  .catch(async (e) => {
-    console.error(e);
-    await prisma.$disconnect();
-    process.exit(1);
-  });
+
+export async function down() {
+  try {
+    const deleted = await prisma.user.deleteMany({
+      where: {
+        email: 'example@example.com', // Condition that identifies the data created by the seed
+      },
+    });
+    console.log(`↩️ Rollback completed: ${deleted.count} records deleted.`);
+  } catch (e) {
+    console.error('❌ Error while performing rollback:', e.message);
+    throw e;
+  }
+}
+;
 ```
 
-2. Ejecutar todas las semillas
+2. ## Run seeds
 
-Para ejecutar todas las semillas en el directorio prisma/seeders, usa:
+To run all the seeds in the prisma/seeders directory, use:
 ```bash
 npx prisma-seeder-custom run
 ```
-Esto hará lo siguiente:
+This will do the following:
 
-1. Verificará si la tabla SeedExecution existe. Si no, ofrecerá crearla automáticamente.
-2. Omitirá las semillas que ya han sido registradas en la tabla SeedExecution.
-3. Ejecutará los scripts de semillas en orden ascendente según su nombre de archivo.
-4. Registrará cada semilla ejecutada exitosamente en la tabla SeedExecution.
+1. It will check if the 'SeedExecution' table exists. If not, it will offer to create it automatically.
+2. Will skip seeds that have already been registered in the 'SeedExecution' table.
+3. It will run the seed scripts in ascending order based on their file name.
+4. It will record each successfully executed seed in the 'SeedExecution' table.
 
-Ejemplo de salida:
+Output example:
 ```bash
-📁 Carpeta de semillas: /proyecto/prisma/seeders
-🗂️ Archivos de semillas ordenados: [ '01_User.js', '02_Post.js' ]
-⚙️ Cargando y ejecutando módulo desde: /proyecto/prisma/seeders/01_User.js
-✅ Semilla "01_User.js" ejecutada correctamente.
-⚙️ Cargando y ejecutando módulo desde: /proyecto/prisma/seeders/02_Post.js
-✅ Semilla "02_Post.js" ejecutada correctamente.
-✅ Semillas ejecutadas correctamente.
+📁 Seeds folder: /project/prisma/seeders
+🗂️ Sorted seed files: [ '20241027163726_User.js', '20241027163729_Post.js' ]
+⚙️ Loading and running module from: /project/prisma/seeders/01_User.js
+✅ Seed "01_User.js" executed successfully.
+⚙️ Loading and running module from: /project/prisma/seeders/02_Post.js
+✅ Seed "02_Post.js" executed successfully.
+✅ Seeds executed correctly.
 ```
 
-## Contribuciones
-Si tienes ideas para mejorar esta herramienta, ¡contribuye al repositorio en GitHub! Apreciaría su colaboración.
+3. ## Reverse seeds
+
+To revert all executed seeds, use:
+```bash
+npx prisma-seeder-custom rollback
+```
+Details about the rollback:
+
+The seeds are reverted in the reverse order of their execution.
+
+If a seed has dependencies, these must be handled manually in the seed file's down function, or you can configure onDelete: Cascade in your Prisma schema.
+
+Example of a 'down' function in a seed file:
+```javascript
+export async function down() {
+  try {
+    const deleted = await prisma.user.deleteMany({
+      where: {
+        email: 'example@example.com', // Condition that identifies the data created by the seed
+      },
+    });
+    console.log(`↩️ Rollback completado: ${deleted.count} registros eliminados.`);
+  } catch (e) {
+    console.error('❌ Error al realizar el rollback:', e.message);
+    throw e;
+  }
+}
+```
+
+## Contributions
+If you have ideas to improve this tool, contribute to the repository on GitHub! I would appreciate your collaboration.
+
+## License
+This project is licensed under the MIT License.

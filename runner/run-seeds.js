@@ -2,28 +2,17 @@ const { execSync } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const inquirer = require('inquirer');
-const { formatDate, loadModule } = require('../utils');
-let prisma;
-
-try {
-  const { PrismaClient } = require(require.resolve('@prisma/client', { paths: [process.cwd()] }));
-  prisma = new PrismaClient();
-} catch (error) {
-  console.error('❌ No se pudo encontrar @prisma/client en el proyecto del usuario:', error.message);
-  process.exit(1);
-}
-
-const projectRoot = path.resolve(process.cwd());
-const seedersDir = path.join(projectRoot, 'prisma', 'seeders');
+const { formatDate, loadModule, getPrismaClient, seedersDir } = require('../utils');
+const prisma = getPrismaClient();
 
 async function ensureSeedExecutionTableExists() {
   try {
     await prisma.$queryRawUnsafe('SELECT 1 FROM "SeedExecution" LIMIT 1');
-    console.log('✅ La tabla "SeedExecution" ya existe.');
+    console.log('✅ The "SeedExecution" table already exists.');
     return true;
   } catch (error) {
     if (error.code === 'P2010') {
-      console.log('ℹ️ La tabla "SeedExecution" no existe. Creándola...');
+      console.log('⚠️ The "SeedExecution" table does not exist. Creating it...');
       try {
         await prisma.$queryRawUnsafe(`
           CREATE TABLE IF NOT EXISTS "SeedExecution" (
@@ -32,14 +21,14 @@ async function ensureSeedExecutionTableExists() {
             executedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
           );
         `);
-        console.log('✅ Tabla "SeedExecution" creada correctamente.');
+        console.log('✅ "SeedExecution" table created successfully.');
         return false;
       } catch (creationError) {
-        console.error('❌ Error al crear la tabla "SeedExecution":', creationError.message);
+        console.error('❌ Error creating table "SeedExecution":', creationError.message);
         process.exit(1);
       }
     } else {
-      console.error('❌ Error al verificar la tabla "SeedExecution":', error.message);
+      console.error('❌ Error checking table "SeedExecution":', error.message);
       await prisma.$disconnect();
       process.exit(1);
     }
@@ -49,16 +38,16 @@ async function ensureSeedExecutionTableExists() {
 async function runMigrations() {
   try {
     const currentDate = formatDate();
-    console.log('ℹ️ Ejecutando migraciones...');
+    console.log('ℹ️ Running migrations...');
     execSync(`npx prisma migrate dev --name=${currentDate}`, { stdio: 'inherit' });
   } catch (error) {
-    console.error('❌ Error al ejecutar migración:', error.message);
+    console.error('❌ Error when running migration:', error.message);
     if (error.message.includes('environment is non-interactive')) {
-      console.log('ℹ️ Aplicando migraciones existentes con `prisma migrate deploy`...');
+      console.log('ℹ️ Applying existing migrations with `prisma migrate deploy`...');
       try {
         execSync('npx prisma migrate deploy', { stdio: 'inherit' });
       } catch (deployError) {
-        console.error('❌ Error al aplicar migraciones existentes:', deployError.message);
+        console.error('❌ Error applying existing migrations:', deployError.message);
         throw deployError;
       }
     } else {
@@ -68,13 +57,12 @@ async function runMigrations() {
 }
 
 async function runFileSeeds() {
-  console.log('📁 Carpeta de semillas:', seedersDir);
+  console.log('📁 Seed folder:', seedersDir);
 
-  const seedFiles = fs.readdirSync(seedersDir).filter(file => file.endsWith('.js'));
-  const sortedSeedFiles = seedFiles.sort();
-  console.log('🗂️ Archivos de semillas ordenados:', sortedSeedFiles);
+  const seedFiles = fs.readdirSync(seedersDir).filter(file => file.endsWith('.js')).sort();
+  console.log('🗂️ Sorted seed files:', seedFiles);
 
-  for (const file of sortedSeedFiles) {
+  for (const file of seedFiles) {
     const seedFunctionName = file.replace('.js', '');
     const existingSeed = await prisma.$queryRawUnsafe(`
       SELECT 1 
@@ -84,20 +72,25 @@ async function runFileSeeds() {
     `, seedFunctionName);
 
     if (existingSeed.length > 0) {
-      console.log(`⚠️ La semilla '${seedFunctionName}' ya fue ejecutada, se omite.`);
+      console.log(`⚠️ Seed '${seedFunctionName}' has already been executed, it is ignored.`);
       continue;
     }
     const modulePath = path.join(seedersDir, file);
-    console.log(`⚙️ Cargando y ejecutando módulo desde: ${modulePath}`);
+    console.log(`⚙️ Loading and running module from: ${modulePath}`);
     try {
-      loadModule(modulePath);
-      console.log(`✅ Semilla "${file}" ejecutada correctamente.`);
+      const seedModule = await loadModule(modulePath);
+      if (typeof seedModule.main !== 'function') {
+        console.warn(`⚠️ The seed ${file} does not have a "main" function, it is ignored.`);
+        continue;
+      }
+      await seedModule.main();
       await prisma.$queryRawUnsafe(`
         INSERT INTO "SeedExecution" (seedName)
         VALUES ($1);
       `, seedFunctionName);
+      console.log(`✅ Seed "${file}" executed successfully.`);
     } catch (error) {
-      console.error(`❌ Error al ejecutar la semilla "${file}":`, error.message);
+      console.error(`❌ Error executing seed "${file}":`, error.message);
       throw error;
     }
   }
@@ -109,25 +102,25 @@ async function runSeeds() {
     const { shouldMigrate } = await inquirer.prompt({
       type: 'confirm',
       name: 'shouldMigrate',
-      message: '⚠️ La tabla "SeedExecution" no existe. ¿Deseas ejecutar migraciones antes de correr las semillas?',
+      message: '⚠️ The table "SeedExecution" does not exist. Do you want to run migrations before running seeds?',
       default: true,
     });
     if (shouldMigrate) {
       try {
         await runMigrations();
       } catch (error) {
-        console.error('❌ Error al ejecutar las migraciones:', error.message);
+        console.error('❌ Error when running migrations:', error.message);
         process.exit(1);
       }
     }
   }
   
   try {
-    console.log('ℹ️ Ejecutando semillas...');
+    console.log('ℹ️ Running seeds...');
     await runFileSeeds();
-    console.log('✅ Semillas ejecutadas correctamente.');
+    console.log('✅ Seeds executed correctly.');
   } catch (error) {
-    console.error('❌ Error al ejecutar las semillas:', error.message);
+    console.error('❌ Error when running seeds:', error.message);
     process.exit(1);
   } finally {
     await prisma.$disconnect();

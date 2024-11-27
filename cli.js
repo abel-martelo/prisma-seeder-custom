@@ -1,20 +1,23 @@
 #!/usr/bin/env node
 
 require('child_process');
-const { generateSeed } = require('./generators/generateSeed');
-const { runSeeds } = require('./runner/runSeeds');
+const { generateSeed } = require('./generators/generate-seeds');
+const { rollbackSeeds } = require('./rollbacks/down-seeds');
+const { runSeeds } = require('./runner/run-seeds');
 
 const [command, ...args] = process.argv.slice(2);
 
 function showHelp() {
   console.log(`
-Uso:
-  prisma-seeder-custom generate <nombre_de_la_semilla>
+Use:
+  prisma-seeder-custom generate <seed_name>
   prisma-seeder-custom run
+  prisma-seeder-custom rollback
 
-Comandos:
-  generate   Crea un nuevo archivo de semilla con el nombre proporcionado.
-  run        Ejecuta todos los archivos de semillas en orden.
+Commands:
+  generate   Creates a new seed file with the given name.
+  run        Run all seed files in order.
+  rollback   Reverts all executed seeds in reverse order, removing their data from the database.
   `);
 }
 
@@ -22,7 +25,7 @@ Comandos:
   try {
     if (command === 'generate') {
       if (args.length === 0) {
-        console.error("Error: Debes proporcionar un nombre para la semilla.");
+        console.error("Error: You must provide a name for the seed.");
         showHelp();
         process.exit(1);
       }
@@ -30,19 +33,26 @@ Comandos:
       await generateSeed(seedName);
     } else if (command === 'run') {
       if (args.length > 0) {
-        console.error("Error: El comando 'run' no acepta argumentos adicionales.");
+        console.error("Error: The 'run' command does not accept additional arguments.");
         showHelp();
         process.exit(1);
       }
       await runSeeds();
-      console.log("Todos los archivos de semillas se han ejecutado con éxito.");
+      console.log("All seed files have been executed successfully.");
+    } else if (command === 'rollback') {
+      if (args.length > 0) {
+        console.error("Error: The 'rollback' command does not accept additional arguments.");
+        showHelp();
+        process.exit(1);
+      }
+        await rollbackSeeds();
     } else {
-      console.error("Error: Comando desconocido.");
+      console.error("Error: Unknown command.");
       showHelp();
       process.exit(1);
     }
   } catch (error) {
-    console.error("Error al ejecutar:", error);
+    console.error("Error executing:", error);
     process.exit(1);
   }
 })();

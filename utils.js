@@ -1,9 +1,13 @@
 const path = require('path');
 const fs = require('fs');
+
+const projectRoot = path.resolve(process.cwd());
+const seedersDir = path.join(projectRoot, 'prisma', 'seeders');
+
 /**
- * Carga un módulo usando require si está disponible, de lo contrario, usa import().
- * @param {string} modulePath - La ruta del módulo a cargar.
- * @returns {Promise<any>} - El módulo cargado.
+ * Load a module using require if available, otherwise use import().
+ * @param {string} modulePath - The path of the module to load.
+ * @returns {Promise<any>} - The module loaded.
  */
 async function loadModule(modulePath) {
   try {
@@ -44,12 +48,14 @@ function detectModuleSystem() {
   return 'commonjs';
 }
 
-async function generateNumberedFileName(directory, baseName) {
-  const files = fs.readdirSync(directory).filter((file) => /^\d+_/.test(file));
-  const numbers = files.map((file) => parseInt(file.split('_')[0], 10));
-  const nextNumber = numbers.length > 0 ? Math.max(...numbers) + 1 : 1;
-  const formattedNumber = String(nextNumber).padStart(2, '0');
-  return `${formattedNumber}_${baseName}`;
-}   
+function getPrismaClient() {
+  try {
+    const { PrismaClient } = require(require.resolve('@prisma/client', { paths: [process.cwd()] }));
+    return new PrismaClient();
+  } catch (error) {
+    console.error('❌ Could not find @prisma/client in the user project:', error.message);
+    process.exit(1);
+  }
+}
 
-module.exports = { generateNumberedFileName, loadModule, formatDate, detectModuleSystem };
+module.exports = { projectRoot, seedersDir, getPrismaClient, loadModule, formatDate, detectModuleSystem };
