@@ -51,7 +51,7 @@ npx prisma migrate dev --name add-seed-execution-model
 
 ## Uso
 
-1. ## Generate a seed file
+## 1. ## Generate a seed file
 Run the following command to generate a seed file:
 ```bash
 npx prisma-seeder-custom generate <model_name>
@@ -110,7 +110,7 @@ export async function down() {
 ;
 ```
 
-2. ## Run seeds
+## 2. ## Run seeds
 
 To run all the seeds in the prisma/seeders directory, use:
 ```bash
@@ -134,7 +134,7 @@ Output example:
 ✅ Seeds executed correctly.
 ```
 
-3. ## Reverse seeds
+## 3. ## Reverse seeds
 
 To revert all executed seeds, use:
 ```bash
