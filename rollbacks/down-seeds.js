@@ -6,9 +6,9 @@ const prisma = getPrismaClient();
 async function rollbackSeeds() {
     console.log('↩️ Starting seed rollback...');
     const executedSeeds = await prisma.$queryRawUnsafe(`
-      SELECT seedName 
+      SELECT "seedName" 
       FROM "SeedExecution" 
-      ORDER BY executedAt DESC;
+      ORDER BY "executedAt" DESC;
     `);
     if (executedSeeds.length === 0) {
       console.log('ℹ️ There are no seeds to reverse.');
@@ -31,7 +31,7 @@ async function rollbackSeeds() {
         await seedModule.down();
         await prisma.$queryRawUnsafe(`
           DELETE FROM "SeedExecution"
-          WHERE seedName = $1;
+          WHERE "seedName" = $1;
         `, seed.seedName);
   
         console.log(`✅ Seed "${seedFile}" successfully reverted.`);

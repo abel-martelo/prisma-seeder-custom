@@ -67,7 +67,7 @@ async function runFileSeeds() {
     const existingSeed = await prisma.$queryRawUnsafe(`
       SELECT 1 
       FROM "SeedExecution" 
-      WHERE seedName = $1
+      WHERE "seedName" = $1
       LIMIT 1;
     `, seedFunctionName);
 
@@ -85,7 +85,7 @@ async function runFileSeeds() {
       }
       await seedModule.main();
       await prisma.$queryRawUnsafe(`
-        INSERT INTO "SeedExecution" (seedName)
+        INSERT INTO "SeedExecution" ("seedName")
         VALUES ($1);
       `, seedFunctionName);
       console.log(`✅ Seed "${file}" executed successfully.`);
